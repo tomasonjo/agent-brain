@@ -24,9 +24,13 @@ plane, working across Claude Code, Codex, and Cursor.
 ```bash
 uv sync
 cp .env.example .env             # fill NEO4J_*, DIFFBOT_API_KEY, ANTHROPIC_API_KEY
-brain init-db                    # apply schema
-brain scheduler &                # background daemon for cron flows
+uv run brain init-db             # apply schema
+uv run brain scheduler &         # background daemon for cron flows
 ```
+
+`uv sync` installs into `./.venv` — it doesn't put `brain` on your shell PATH.
+Either prefix commands with `uv run` (as above), `source .venv/bin/activate`
+first, or `uv tool install .` to expose `brain` globally.
 
 Then run a client in the repo root:
 
