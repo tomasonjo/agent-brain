@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "agent-brain": {
-      "command": "uv",
-      "args": ["run", "--quiet", "python", "-m", "brain.mcp_server.server"]
-    }
-  }
-}
