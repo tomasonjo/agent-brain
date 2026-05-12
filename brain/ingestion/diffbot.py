@@ -8,6 +8,7 @@ Docs: https://docs.diffbot.com/reference/knowledge-graph-dql
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 import httpx
@@ -37,6 +38,11 @@ class Article:
         }
 
 
+def _split_or_terms(text: str) -> list[str]:
+    parts = re.split(r"\s+OR\s+|\s*\|\s*", text)
+    return [p.strip() for p in parts if p.strip()]
+
+
 def build_query(
     *,
     category: str | None = None,
@@ -47,7 +53,9 @@ def build_query(
     """Build a DQL query string for Articles.
 
     - category matches `categories.name:"..."` (Diffbot taxonomy).
-    - text is a free-text filter `text:"..."` against article body.
+    - text is a free-text filter. Multiple terms separated by ` OR ` or `|`
+      become `text:or("a", "b", ...)` (DQL function-call OR). A single term
+      becomes `text:"..."`.
     - date_within e.g. "1d", "3d", "7d" → `date<Nd`.
     - extra is appended verbatim if you need richer DQL.
     """
@@ -55,7 +63,12 @@ def build_query(
     if category:
         parts.append(f'categories.name:"{category}"')
     if text:
-        parts.append(f'text:"{text}"')
+        terms = _split_or_terms(text)
+        if len(terms) > 1:
+            joined = ", ".join(f'"{t}"' for t in terms)
+            parts.append(f"text:or({joined})")
+        elif terms:
+            parts.append(f'text:"{terms[0]}"')
     if date_within:
         parts.append(f"date<{date_within}")
     if extra:
@@ -78,7 +91,7 @@ def search(
         "type": "query",
         "token": SETTINGS.diffbot_api_key,
         "query": query,
-        "size": str(min(limit, 50)),
+        "size": str(min(limit, 100)),
     }
     with httpx.Client(timeout=30.0) as client:
         resp = client.get(DQL_ENDPOINT, params=params)
@@ -87,14 +100,15 @@ def search(
     items = body.get("data") or []
     out: list[Article] = []
     for it in items[:limit]:
+        e = it.get("entity") if isinstance(it.get("entity"), dict) else it
         out.append(
             Article(
-                title=it.get("title") or it.get("name") or "(untitled)",
-                summary=it.get("summary") or it.get("text", "")[:1000],
-                url=it.get("pageUrl") or it.get("url", ""),
-                site=(it.get("siteName") or it.get("site")),
-                published_at=it.get("date", {}).get("str") if isinstance(it.get("date"), dict) else it.get("date"),
-                categories=[c.get("name") for c in (it.get("categories") or []) if c.get("name")],
+                title=e.get("title") or e.get("name") or "(untitled)",
+                summary=e.get("summary") or e.get("text", "")[:1000],
+                url=e.get("pageUrl") or e.get("url", ""),
+                site=(e.get("siteName") or e.get("site")),
+                published_at=e.get("date", {}).get("str") if isinstance(e.get("date"), dict) else e.get("date"),
+                categories=[c.get("name") for c in (e.get("categories") or []) if c.get("name")],
             )
         )
     return out

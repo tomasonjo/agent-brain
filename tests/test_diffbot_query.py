@@ -21,3 +21,19 @@ def test_no_category_no_text():
 def test_extra_appended():
     q = build_query(category="Technology", extra="language:en")
     assert q.endswith("language:en")
+
+
+def test_text_or_split_with_or_keyword():
+    q = build_query(text="GraphRAG OR knowledge graph OR retrieval augmented generation")
+    assert 'text:or("GraphRAG", "knowledge graph", "retrieval augmented generation")' in q
+
+
+def test_text_or_split_with_pipe():
+    q = build_query(text="graph analytics | graph algorithm | graph database")
+    assert 'text:or("graph analytics", "graph algorithm", "graph database")' in q
+
+
+def test_text_single_term_unchanged():
+    q = build_query(text="openai")
+    assert 'text:"openai"' in q
+    assert "text:or(" not in q
